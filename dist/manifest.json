@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Context Escape Hatch",
+  "name": "Surfboard",
   "version": "1.0.0",
   "description": "Save your context and intentions for each tab",
   "permissions": [
@@ -11,6 +11,20 @@
   ],
   "host_permissions": [
     "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "service-worker-loader.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "js": [
+        "assets/content-script.ts-loader-22b81ef1.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
   ],
   "action": {
     "default_popup": "index.html",
@@ -24,5 +38,17 @@
     "16": "assets/icon.svg",
     "48": "assets/icon.svg",
     "128": "assets/icon.svg"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "resources": [
+        "assets/storage-15de54d1.js",
+        "assets/content-script.ts-6f7faf6e.js"
+      ],
+      "use_dynamic_url": false
+    }
+  ]
 }

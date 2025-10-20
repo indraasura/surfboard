@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Context Escape Hatch",
+  "name": "Surfboard",
   "version": "1.0.0",
   "description": "Save your context and intentions for each tab",
   "permissions": [
@@ -12,6 +12,16 @@
   "host_permissions": [
     "<all_urls>"
   ],
+  "background": {
+    "service_worker": "src/background.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content-script.ts"]
+    }
+  ],
   "action": {
     "default_popup": "index.html",
     "default_icon": {
@@ -20,7 +30,6 @@
       "128": "assets/icon.svg"
     }
   },
-
   "icons": {
     "16": "assets/icon.svg",
     "48": "assets/icon.svg",

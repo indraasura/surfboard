@@ -12,6 +12,11 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
           type: 'SHOW_NOTE_OVERLAY', 
           note: note.note 
         });
+      } else {
+        // Show reminder if no note exists
+        chrome.tabs.sendMessage(activeInfo.tabId, {
+          type: 'SHOW_INTENT_PROMPT'
+        });
       }
     }
   }, 1000); // Small delay to be less intrusive
@@ -27,7 +32,22 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
           type: 'SHOW_NOTE_OVERLAY', 
           note: note.note 
         });
+      } else {
+        // Show reminder if no note exists
+        chrome.tabs.sendMessage(tabId, {
+          type: 'SHOW_INTENT_PROMPT'
+        });
       }
     }, 1000); // Small delay to be less intrusive
   }
+});
+
+// Listen for messages from content script
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'OPEN_POPUP') {
+    // Open the extension popup
+    chrome.action.openPopup();
+    sendResponse({ success: true });
+  }
+  return true; // Keep the message channel open for async responses
 });

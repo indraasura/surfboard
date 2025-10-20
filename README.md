@@ -1,4 +1,4 @@
-# Context Escape Hatch
+# urfboard
 
 A Chrome Extension that helps you save your current tab's intention (short note) and reminds you of it when you return to that tab.
 

@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { TabNote, getAllNotes, getNoteByUrl, saveNote, deleteNote } from '../utils/storage';
 
-const Popup: React.FC = () => {
+const Popup = () => {
   const [currentTab, setCurrentTab] = useState<chrome.tabs.Tab | null>(null);
-  const [notes, setNotes] = useState<TabNote[]>([]);
   const [noteText, setNoteText] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
+  const [notes, setNotes] = useState<TabNote[]>([]);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [showNoNotePrompt, setShowNoNotePrompt] = useState(false);
   const [showReminder, setShowReminder] = useState(false);
   const [existingNote, setExistingNote] = useState<TabNote | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     // Get current tab information
@@ -37,11 +38,11 @@ const Popup: React.FC = () => {
                   overlay.style.right = '20px';
                   overlay.style.backgroundColor = 'white';
                   overlay.style.borderLeft = '3px solid #4285f4';
-                  overlay.style.boxShadow = '-2px 0 8px rgba(0, 0, 0, 0.1)';
-                  overlay.style.padding = '12px';
+                  overlay.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  overlay.style.padding = '16px';
                   overlay.style.maxWidth = '300px';
                   overlay.style.zIndex = '9999';
-                  overlay.style.borderRadius = '4px';
+                  overlay.style.borderRadius = '8px';
                   
                   // Add title
                   const title = document.createElement('h3');
@@ -87,6 +88,9 @@ const Popup: React.FC = () => {
                 args: [note.note]
               }).catch(err => console.error("Error injecting script:", err));
             }
+          } else {
+            // No note exists for this URL, show prompt
+            setShowNoNotePrompt(true);
           }
         }
         
@@ -97,128 +101,358 @@ const Popup: React.FC = () => {
     });
   }, []);
 
-  const handleSaveNote = async () => {
-    if (!currentTab || !currentTab.url || !noteText.trim()) return;
+  const handleSaveNote = () => {
+    if (!currentTab?.url || !noteText.trim()) return;
     
-    const note: TabNote = {
-      id: editingNoteId || currentTab.id?.toString() || Date.now().toString(),
+    const noteData: TabNote = {
+      id: editingNoteId || Date.now().toString(),
       url: currentTab.url,
       title: currentTab.title || 'Untitled',
-      note: noteText,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
+      note: noteText.trim(),
+      createdAt: editingNoteId ? (existingNote?.createdAt || Date.now()) : Date.now(),
+      updatedAt: Date.now(),
     };
     
-    await saveNote(note);
-    
-    // Reset state
-    setNoteText('');
-    setIsEditing(false);
-    setEditingNoteId(null);
-    
-    // Refresh notes list
-    const updatedNotes = await getAllNotes();
-    setNotes(updatedNotes);
-    
-    // Show confirmation
-    setExistingNote(note);
-    setShowReminder(true);
+    saveNote(noteData).then(() => {
+      // Update the notes list
+      getAllNotes().then((allNotes) => {
+        setNotes(allNotes);
+      });
+      
+      // Reset the form
+      setNoteText('');
+      setEditingNoteId(null);
+      setIsEditing(false);
+      
+      // Update existing note if we just saved for the current URL
+      if (currentTab.url) {
+        getNoteByUrl(currentTab.url).then((note) => {
+          if (note) {
+            setExistingNote(note);
+            setShowReminder(true);
+            setShowNoNotePrompt(false);
+          }
+        });
+      }
+      
+      // Inject a notification into the page
+      injectNotification(editingNoteId ? 'Note updated' : 'Note saved');
+    });
   };
 
-  const handleDeleteNote = async (noteId: string) => {
-    await deleteNote(noteId);
-    
-    // Refresh notes list
-    const updatedNotes = await getAllNotes();
-    setNotes(updatedNotes);
-    
-    // If we were editing this note, reset the form
-    if (editingNoteId === noteId) {
-      setNoteText('');
-      setIsEditing(false);
-      setEditingNoteId(null);
-      setExistingNote(null);
-      setShowReminder(false);
-    }
+  const handleDeleteNote = (noteId: string) => {
+    deleteNote(noteId).then(() => {
+      // Update the notes list
+      getAllNotes().then((allNotes) => {
+        setNotes(allNotes);
+      });
+      
+      // If we deleted the note for the current URL, update the UI
+      if (existingNote && existingNote.id === noteId) {
+        setExistingNote(null);
+        setShowReminder(false);
+        setShowNoNotePrompt(true);
+      }
+    });
   };
 
   const handleEditNote = (note: TabNote) => {
     setNoteText(note.note);
-    setIsEditing(true);
     setEditingNoteId(note.id);
+    setIsEditing(true);
   };
 
+  const injectNotification = (message: string) => {
+    if (!currentTab?.id) return;
+    
+    // Inject the notification into the page
+    chrome.scripting.executeScript({
+      target: { tabId: currentTab.id },
+      func: (notificationMessage) => {
+        // Create the notification element
+        const notification = document.createElement('div');
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.right = '20px';
+        notification.style.backgroundColor = '#4285f4';
+        notification.style.color = 'white';
+        notification.style.padding = '12px 16px';
+        notification.style.borderRadius = '8px';
+        notification.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+        notification.style.zIndex = '9999';
+        notification.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+        notification.style.fontSize = '14px';
+        notification.style.transition = 'opacity 0.3s ease-in-out';
+        notification.style.display = 'flex';
+        notification.style.alignItems = 'center';
+        notification.style.gap = '8px';
+        
+        // Add an icon
+        const icon = document.createElement('div');
+        icon.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        `;
+        notification.appendChild(icon);
+        
+        // Add the message
+        const text = document.createElement('span');
+        text.textContent = notificationMessage;
+        notification.appendChild(text);
+        
+        // Add a close button
+        const closeButton = document.createElement('div');
+        closeButton.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px; cursor: pointer;">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        `;
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.marginLeft = '8px';
+        closeButton.onclick = () => {
+          document.body.removeChild(notification);
+        };
+        notification.appendChild(closeButton);
+        
+        // Add to the page
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+          if (document.body.contains(notification)) {
+            notification.style.opacity = '0';
+            setTimeout(() => {
+              if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+              }
+            }, 300);
+          }
+        }, 10000);
+      },
+      args: [message],
+    });
+  };
+  
   return (
-    <div className="popup-container">
-      <header className="popup-header">
-        <h1>Context Escape Hatch</h1>
+    <div className="popup-container" style={{ width: '350px', padding: '16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <header style={{ 
+        background: '#4285f4', 
+        color: 'white', 
+        padding: '12px 16px', 
+        borderRadius: '8px', 
+        marginBottom: '16px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      }}>
+        <h1 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>Surfboard</h1>
       </header>
       
       {currentTab && (
-        <div className="current-tab">
-          <h2>{currentTab.title}</h2>
-          <p className="url">{currentTab.url}</p>
-          
-          {showReminder && existingNote && (
-            <div className="reminder-box">
-              <h3>Your intention for this tab:</h3>
-              <p className="reminder-text">{existingNote.note}</p>
-              <button onClick={() => handleEditNote(existingNote)} className="edit-button">
-                Edit
-              </button>
-            </div>
-          )}
-          
-          <div className="note-form">
-            <textarea
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              placeholder={showReminder ? "Update your intention" : "What's your intention for this tab?"}
-              rows={3}
-            />
-            <button onClick={handleSaveNote}>
-              {isEditing ? 'Update Note' : 'Save Note'}
-            </button>
-            {isEditing && (
-              <button 
-                onClick={() => {
-                  setNoteText('');
-                  setIsEditing(false);
-                  setEditingNoteId(null);
-                }}
-                className="cancel-button"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-      
-      <div className="notes-list">
-        <h3>Your Saved Notes</h3>
-        {notes.length === 0 ? (
-          <p className="empty-state">No notes saved yet.</p>
-        ) : (
-          notes.map((note) => (
-            <div key={note.id} className="note-item">
-              <div className="note-content">
-                <h4>{note.title}</h4>
-                <p className="note-url">{note.url}</p>
-                <p className="note-text">{note.note}</p>
+        <div>
+          <div style={{ 
+            background: 'white', 
+            borderRadius: '8px', 
+            padding: '16px', 
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+            border: '1px solid #eee'
+          }}>
+            <h2 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '500' }}>{currentTab.title}</h2>
+            <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#666', wordBreak: 'break-all' }}>{currentTab.url}</p>
+            
+            {showNoNotePrompt && !showReminder && (
+              <div style={{ 
+                background: '#e8f0fe', 
+                padding: '12px', 
+                borderRadius: '6px', 
+                marginBottom: '16px',
+                borderLeft: '3px solid #4285f4'
+              }}>
+                <h3 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: '500', color: '#1a73e8' }}>No intent saved</h3>
+                <p style={{ margin: 0, fontSize: '13px', color: '#444' }}>
+                  Add your intention for this page below
+                </p>
               </div>
-              <div className="note-actions">
-                <button onClick={() => handleEditNote(note)} className="edit-button">
+            )}
+            
+            {showReminder && existingNote && (
+              <div style={{ 
+                background: '#e8f0fe', 
+                padding: '12px', 
+                borderRadius: '6px', 
+                marginBottom: '16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                borderLeft: '3px solid #4285f4'
+              }}>
+                <div>
+                  <h3 style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: '500', color: '#1a73e8' }}>Your saved intent:</h3>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#333' }}>{existingNote.note}</p>
+                </div>
+                <button 
+                  onClick={() => handleEditNote(existingNote)} 
+                  style={{ 
+                    background: 'transparent', 
+                    border: 'none', 
+                    color: '#1a73e8', 
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    padding: '4px 8px',
+                    borderRadius: '4px'
+                  }}
+                >
                   Edit
                 </button>
-                <button onClick={() => handleDeleteNote(note.id)} className="delete-button">
-                  Delete
+              </div>
+            )}
+            
+            <div>
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder={showReminder ? "Update your intention" : "What's your intention for this tab?"}
+                rows={3}
+                style={{ 
+                  width: '100%', 
+                  padding: '10px', 
+                  borderRadius: '6px', 
+                  border: '1px solid #ddd',
+                  marginBottom: '8px',
+                  fontSize: '14px',
+                  resize: 'none'
+                }}
+              />
+              
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                {isEditing && (
+                  <button 
+                    onClick={() => {
+                      setNoteText('');
+                      setIsEditing(false);
+                      setEditingNoteId(null);
+                    }}
+                    style={{ 
+                      background: '#f1f3f4', 
+                      border: 'none', 
+                      padding: '6px 12px', 
+                      borderRadius: '4px',
+                      fontSize: '13px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                )}
+                
+                <button 
+                  onClick={handleSaveNote}
+                  disabled={!noteText.trim()}
+                  style={{ 
+                    background: '#4285f4', 
+                    color: 'white', 
+                    border: 'none', 
+                    padding: '6px 12px', 
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    cursor: noteText.trim() ? 'pointer' : 'not-allowed',
+                    opacity: noteText.trim() ? 1 : 0.7
+                  }}
+                >
+                  {isEditing ? 'Update' : 'Save Note'}
                 </button>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          </div>
+          
+          {notes.length > 0 && (
+            <div style={{ marginTop: '16px' }}>
+              <div style={{ 
+                borderTop: '1px solid #eee', 
+                paddingTop: '12px', 
+                marginBottom: '8px' 
+              }}>
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '500' }}>Recent Notes</h3>
+              </div>
+              <div style={{ 
+                maxHeight: '200px', 
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                {notes.map(note => (
+                  <div 
+                    key={note.id} 
+                    style={{ 
+                      padding: '10px', 
+                      borderRadius: '6px', 
+                      border: '1px solid #eee',
+                      background: 'white'
+                    }}
+                  >
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start'
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <h4 style={{ 
+                          margin: '0 0 4px 0', 
+                          fontSize: '13px', 
+                          fontWeight: '500',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>{note.title}</h4>
+                        <p style={{ 
+                          margin: 0, 
+                          fontSize: '12px',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
+                        }}>{note.note}</p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button 
+                          onClick={() => handleEditNote(note)} 
+                          style={{ 
+                            background: 'transparent', 
+                            border: 'none', 
+                            color: '#1a73e8', 
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            padding: '2px 6px',
+                            borderRadius: '4px'
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteNote(note.id)} 
+                          style={{ 
+                            background: 'transparent', 
+                            border: 'none', 
+                            color: '#ea4335', 
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            padding: '2px 6px',
+                            borderRadius: '4px'
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
