@@ -133,15 +133,21 @@ chrome.runtime.onMessage.addListener((message) => {
 async function checkForNotes() {
   try {
     // Skip chrome:// and edge:// URLs
-    if (window.location.href.startsWith('chrome://') || window.location.href.startsWith('edge://')) {
+    if (window.location.href.startsWith('chrome://') || 
+        window.location.href.startsWith('edge://') || 
+        window.location.href.startsWith('chrome-extension://') ||
+        window.location.href.startsWith('about:')) {
       return;
     }
     
+    console.log('Checking for notes at URL:', window.location.href);
     const note = await getNoteByUrl(window.location.href);
     if (note) {
+      console.log('Found note, displaying overlay');
       createOverlay(note.note);
     } else {
       // Show reminder to add intent
+      console.log('No note found, displaying reminder');
       createOverlay('', true);
     }
   } catch (error) {
@@ -149,5 +155,19 @@ async function checkForNotes() {
   }
 }
 
-// Check for notes when the page loads with a slight delay to be less intrusive
-setTimeout(checkForNotes, 2000);
+// Ensure the content script runs when the DOM is fully loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    // Check for notes with a slight delay to ensure storage is accessible
+    setTimeout(checkForNotes, 1000);
+  });
+} else {
+  // DOM already loaded, run directly with a slight delay
+  setTimeout(checkForNotes, 1000);
+}
+
+// Also run when the page is fully loaded (including images)
+window.addEventListener('load', () => {
+  // Check again after page is fully loaded
+  setTimeout(checkForNotes, 2000);
+});
