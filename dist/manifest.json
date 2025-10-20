@@ -18,11 +18,11 @@
   },
   "content_scripts": [
     {
-      "js": [
-        "assets/content-script.ts-loader-fb6fa34c.js"
-      ],
       "matches": [
         "<all_urls>"
+      ],
+      "js": [
+        "src/content-script.ts-loader.js"
       ],
       "run_at": "document_end"
     }
@@ -46,8 +46,8 @@
         "<all_urls>"
       ],
       "resources": [
-        "assets/storage-15de54d1.js",
-        "assets/content-script.ts-5b19a0ba.js"
+        "**/*",
+        "*"
       ],
       "use_dynamic_url": false
     }

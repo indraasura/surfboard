@@ -2,11 +2,15 @@
 // Import storage utilities
 import { getNoteByUrl } from './utils/storage';
 
+let overlayHasShown = false;
+
 // Create overlay to show notes
 function createOverlay(note: string, isReminder = false) {
-  // Remove any existing overlay
-  removeOverlay();
-
+  // Prevent duplicate overlays
+  // Do not create a new overlay if one has already been shown or exists in the DOM
+  if (overlayHasShown || document.getElementById('context-escape-hatch-overlay')) {
+    return;
+  }
   // Create overlay element
   const overlay = document.createElement('div');
   overlay.id = 'context-escape-hatch-overlay';
@@ -14,26 +18,27 @@ function createOverlay(note: string, isReminder = false) {
   overlay.style.top = '20px';
   overlay.style.right = '20px';
   overlay.style.backgroundColor = 'white';
-  overlay.style.borderLeft = isReminder ? '3px solid #ea4335' : '3px solid #4285f4';
-  overlay.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+  overlay.style.borderLeft = isReminder ? '2px solid #f4cccc' : '2px solid #d2e3fc';
+  overlay.style.boxShadow = '0 1px 8px rgba(0, 0, 0, 0.08)';
   overlay.style.padding = '12px';
-  overlay.style.width = '280px';
-  overlay.style.maxWidth = '280px';
+  overlay.style.width = '240px';
+  overlay.style.maxWidth = '240px';
   overlay.style.zIndex = '9999999';
   overlay.style.borderRadius = '4px';
   overlay.style.boxSizing = 'border-box';
+  overlay.style.opacity = '0.95';
   overlay.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif';
 
   // Add CSS animation
   const style = document.createElement('style');
   style.textContent = `
-    @keyframes slideIn {
-      from { transform: translateX(20px); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
   `;
   document.head.appendChild(style);
-  overlay.style.animation = 'slideIn 0.3s ease-out';
+  overlay.style.animation = 'fadeIn 0.2s ease-out';
 
   // Add title
   const title = document.createElement('h3');
@@ -107,9 +112,9 @@ function createOverlay(note: string, isReminder = false) {
 
   // Add to document
   document.body.appendChild(overlay);
-
-  // Auto-remove after 10 seconds
-  setTimeout(removeOverlay, 10000);
+  overlayHasShown = true;
+  // Auto-remove after ~6 seconds
+  setTimeout(removeOverlay, 6000);
 }
 
 // Remove overlay
@@ -122,6 +127,10 @@ function removeOverlay() {
 
 // Listen for messages from popup and background
 chrome.runtime.onMessage.addListener((message) => {
+  // Prevent duplicate overlays if one has already been shown or exists
+  if (overlayHasShown || document.getElementById('context-escape-hatch-overlay')) {
+    return;
+  }
   if (message.type === 'SHOW_NOTE_OVERLAY' && message.note) {
     createOverlay(message.note);
   } else if (message.type === 'SHOW_INTENT_PROMPT') {
@@ -160,7 +169,7 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     // Check for notes with a slight delay to ensure storage is accessible
     setTimeout(checkForNotes, 1000);
-  });
+  }, { once: true });
 } else {
   // DOM already loaded, run directly with a slight delay
   setTimeout(checkForNotes, 1000);
@@ -170,4 +179,4 @@ if (document.readyState === 'loading') {
 window.addEventListener('load', () => {
   // Check again after page is fully loaded
   setTimeout(checkForNotes, 2000);
-});
+}, { once: true });
