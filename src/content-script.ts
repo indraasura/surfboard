@@ -17,9 +17,22 @@ function createOverlay(note: string, isReminder = false) {
   overlay.style.borderLeft = isReminder ? '3px solid #ea4335' : '3px solid #4285f4';
   overlay.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
   overlay.style.padding = '12px';
-  overlay.style.maxWidth = '300px';
-  overlay.style.zIndex = '9999';
+  overlay.style.width = '280px';
+  overlay.style.maxWidth = '280px';
+  overlay.style.zIndex = '9999999';
   overlay.style.borderRadius = '4px';
+  overlay.style.boxSizing = 'border-box';
+  overlay.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif';
+
+  // Add CSS animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(20px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
   overlay.style.animation = 'slideIn 0.3s ease-out';
 
   // Add title
@@ -29,6 +42,7 @@ function createOverlay(note: string, isReminder = false) {
   title.style.color = isReminder ? '#ea4335' : '#4285f4';
   title.style.marginBottom = '6px';
   title.style.fontWeight = '500';
+  title.style.margin = '0 0 6px 0';
   overlay.appendChild(title);
 
   // Add note text or reminder
@@ -38,8 +52,15 @@ function createOverlay(note: string, isReminder = false) {
   noteText.style.margin = '0 0 10px 0';
   noteText.style.color = '#333';
   noteText.style.fontWeight = isReminder ? '400' : '500';
+  noteText.style.wordBreak = 'break-word';
   overlay.appendChild(noteText);
 
+  // Create button container for proper alignment
+  const buttonContainer = document.createElement('div');
+  buttonContainer.style.display = 'flex';
+  buttonContainer.style.justifyContent = 'flex-start';
+  buttonContainer.style.gap = '8px';
+  
   // Add action button
   const actionButton = document.createElement('button');
   
@@ -64,8 +85,7 @@ function createOverlay(note: string, isReminder = false) {
   actionButton.style.borderRadius = '4px';
   actionButton.style.cursor = 'pointer';
   actionButton.style.fontSize = '12px';
-  actionButton.style.marginRight = '8px';
-  overlay.appendChild(actionButton);
+  buttonContainer.appendChild(actionButton);
   
   // Add dismiss button for reminders
   if (isReminder) {
@@ -79,8 +99,11 @@ function createOverlay(note: string, isReminder = false) {
     dismissButton.style.fontSize = '12px';
     dismissButton.style.color = '#333';
     dismissButton.onclick = removeOverlay;
-    overlay.appendChild(dismissButton);
+    buttonContainer.appendChild(dismissButton);
   }
+
+  // Add button container to overlay
+  overlay.appendChild(buttonContainer);
 
   // Add to document
   document.body.appendChild(overlay);

@@ -4,6 +4,10 @@ import { crx } from '@crxjs/vite-plugin';
 import { resolve } from 'path';
 import manifest from './src/manifest.json';
 
+// Fix manifest paths for proper building
+manifest.background.service_worker = 'src/background.ts';
+manifest.content_scripts[0].js = ['src/content-script.ts'];
+
 export default defineConfig({
   plugins: [
     react(),
@@ -13,12 +17,5 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src'),
     },
-  },
-  build: {
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'index.html')
-      }
-    }
   }
 });

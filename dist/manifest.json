@@ -19,11 +19,12 @@
   "content_scripts": [
     {
       "js": [
-        "assets/content-script.ts-loader-22b81ef1.js"
+        "assets/content-script.ts-loader-23b9d468.js"
       ],
       "matches": [
         "<all_urls>"
-      ]
+      ],
+      "run_at": "document_end"
     }
   ],
   "action": {
@@ -46,7 +47,7 @@
       ],
       "resources": [
         "assets/storage-15de54d1.js",
-        "assets/content-script.ts-6f7faf6e.js"
+        "assets/content-script.ts-5f81f17f.js"
       ],
       "use_dynamic_url": false
     }
